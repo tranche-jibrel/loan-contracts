@@ -1,0 +1,28 @@
+{
+  "name": "jibrel-loans-factory",
+  "version": "3.0.0",
+  "description": "",
+  "main": "truffle-config.js",
+  "scripts": {
+    "test": "mocha --exit --recursive --timeout 20000",
+    "compile": "npx truffle compile"
+  },
+  "author": "Fabio Pacchioni",
+  "license": "ISC",
+  "dependencies": {
+    "@openzeppelin/contracts": "^3.1.0",
+    "@truffle/hdwallet-provider": "latest",
+    "dotenv": "^8.2.0",
+    "ganache-core": "latest",
+    "mocha": "^8.1.3",
+    "truffle": "^5.1.46",
+    "truffle-flattener": "^1.5.0",
+    "web3": "^1.3.0"
+  },
+  "devDependencies": {
+    "@openzeppelin/test-environment": "^0.1.5",
+    "@openzeppelin/test-helpers": "^0.5.6",
+    "chai": "^4.2.0",
+    "chai-bn": "^0.2.1"
+  }
+}
