@@ -36,9 +36,6 @@ describe('JLoansCancelled', function () {
   
   const [ tokenOwner, factoryOwner, borrower1, borrower2, borrower3, borrower4, lender1, lender2, factoryAdmin ] = accounts;
 
-  var collAmount = 0;
-  var loanStatus = 0;
-
   //beforeEach(async function () {
 
   //});
@@ -60,7 +57,7 @@ describe('JLoansCancelled', function () {
     console.log(`Loan0 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
     JFeesCollBalance = await this.JFeesCollector.getEthBalance();
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} ETH`);
-    var borrBal = await web3.eth.getBalance(borrower1);
+    borrBal = await web3.eth.getBalance(borrower1);
     console.log(`New borrower1 Balance: ${web3.utils.fromWei(borrBal, "ether")} ETH`);
   });
 
@@ -77,7 +74,7 @@ describe('JLoansCancelled', function () {
     console.log(`Loan3 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} Coll. Tokens`);
     JFeesCollBalance = await this.JFeesCollector.getTokenBalance(this.erc20Coll1.address);
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} Coll. Tokens`);
-    var borrBal = await this.erc20Coll1.balanceOf(borrower4);
+    borrBal = await this.erc20Coll1.balanceOf(borrower4);
     console.log(`New borrower4 Balance: ${web3.utils.fromWei(borrBal, "ether")} Coll.Tokens`);
   });
 

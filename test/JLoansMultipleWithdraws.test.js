@@ -48,8 +48,6 @@ describe('JLoansMultipleWithdraws', function () {
 
   const [ tokenOwner, factoryOwner, borrower1, borrower2, borrower3, borrower4, lender1, lender2, factoryAdmin, lender3 ] = accounts;
 
-  var loanStatus = 0;
-
   //beforeEach(async function () {
 
   //});

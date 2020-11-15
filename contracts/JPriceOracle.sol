@@ -6,12 +6,12 @@
  */
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "./IJFactory.sol";
 import "./IJPriceOracle.sol";
 
-contract JPriceOracle is Ownable, IJPriceOracle { 
+contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle { 
     using SafeMath for uint256;
 
     address public factoryAddress;
@@ -19,10 +19,10 @@ contract JPriceOracle is Ownable, IJPriceOracle {
     struct Pair {
         string pairName;
         uint pairValue;
-        uint8 pairDecimals;
         address baseAddress;
-        uint8 baseDecimals;
         address quoteAddress;
+        uint8 pairDecimals;
+        uint8 baseDecimals;
         uint8 quoteDecimals;
     }
     mapping(uint => Pair) public pairs;
@@ -33,7 +33,9 @@ contract JPriceOracle is Ownable, IJPriceOracle {
     event NewPairDecimals(uint indexed pairId, string indexed pairName, uint8 baseDecimals, uint8 quoteDecimals);
     event NewPairAddresses(uint indexed pairId, string indexed pairName, address baseAddress , address quoteAddress);
 
-    constructor () public { }
+    function initialize() public initializer() {
+        OwnableUpgradeSafe.__Ownable_init();
+    }
 
     modifier onlyAdmins() {
         require(IJFactory(factoryAddress).isAdmin(msg.sender), "!Admin");

@@ -44,9 +44,6 @@ describe('JLoansForeclosedByRatio', function () {
 
   const [ tokenOwner, factoryOwner, borrower1, borrower2, borrower3, borrower4, lender1, lender2, factoryAdmin, foreclosureAgent ] = accounts;
 
-  var loanStatus = 0;
-
-
   //beforeEach(async function () {
 
   //});
@@ -93,7 +90,7 @@ describe('JLoansForeclosedByRatio', function () {
     console.log("Loan0 collateral ratio: " + await this.loanContract.getActualCollateralRatio(0));
     collToAdd = await this.loanContract.calcDiffCollAmountForRatio(0, 155);
     console.log("Collateral to add to raise ratio to 155%: " + collToAdd);
-    await expectRevert(this.loanContract.depositEthCollateral(0, {from: borrower1, value: collToAdd}), "Returned error: sender doesn't have enough funds to send tx. The upfront cost is: 9852944210179369276 and the sender's account only has: 5973375533170266123");
+    await expectRevert(this.loanContract.depositEthCollateral(0, {from: borrower1, value: collToAdd}), "Returned error: sender doesn't have enough funds to send tx. The upfront cost is: 9852944210179369276 and the sender's account only has: 5973284373170266123");
     contractBalance = await this.loanContract.getContractBalance(0);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
     loanBalance = await this.loanContract.getLoanBalance(0);
@@ -272,7 +269,7 @@ describe('JLoansForeclosedByRatio', function () {
   it('borrowers cannot send any collateral to foreclosed contract', async function () {
     one_eth = web3.utils.toWei('1', "ether");
     await expectRevert(web3.eth.sendTransaction({from: borrower1, to: this.loanContract.address, value: one_eth}), "revert");
-    await expectRevert(this.loanContract.depositEthCollateral(0, {from: borrower1, value: one_eth}), "!Status14");
+    await expectRevert(this.loanContract.depositEthCollateral(0, {from: borrower1, value: one_eth}), "!Status04");
     tx = await this.loanContract.depositEthCollateral(1, {from: borrower2, value: one_eth});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;

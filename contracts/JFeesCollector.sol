@@ -6,17 +6,18 @@
  */
 pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "./TransferHelper.sol";
 
 
-contract JFeesCollector is Ownable, ReentrancyGuard {
+contract JFeesCollector is OwnableUpgradeSafe {
     using SafeMath for uint;
 
     mapping(address => bool) public tokensAllowed;
+
+    bool public fLock;
     
     event EthReceived(address sender, uint amount, uint blockNumber);
     event EthWithdrawed(uint amount, uint blockNumber);
@@ -24,7 +25,9 @@ contract JFeesCollector is Ownable, ReentrancyGuard {
     event TokenRemoved(address token, uint blockNumber);
     event TokenWithdrawed(address token, uint amount, uint blockNumber);
 
-    constructor() payable public { }
+    function initialize() public initializer {
+        OwnableUpgradeSafe.__Ownable_init();
+    }
     
     function getEthBalance() external view returns (uint) {
         return address(this).balance;
@@ -38,10 +41,13 @@ contract JFeesCollector is Ownable, ReentrancyGuard {
     * @dev withdraw eth amount
     * @param _amount amount of withdrawed eth
     */
-    function ethWithdraw(uint _amount) external nonReentrant onlyOwner {
+    function ethWithdraw(uint _amount) external onlyOwner {
+        require(!fLock, "locked");
+        fLock = true;
         require(_amount <= address(this).balance, "Not enough contract balance");
         TransferHelper.safeTransferETH(msg.sender, _amount);
         emit EthWithdrawed(_amount, block.number);
+        fLock = false;
     }
 
     /**
@@ -85,9 +91,12 @@ contract JFeesCollector is Ownable, ReentrancyGuard {
     * @param _tok address of the token
     * @param _amount token amount
     */
-    function withdrawTokens(address _tok, uint _amount) external nonReentrant onlyOwner {
+    function withdrawTokens(address _tok, uint _amount) external onlyOwner {
+        require(!fLock, "locked");
+        fLock = true;
         require(isTokenAllowed(_tok), "Token not allowed");
         TransferHelper.safeTransfer(_tok, msg.sender, _amount);
         emit TokenWithdrawed(_tok, _amount, block.number);
+        fLock = false;
     }
 }

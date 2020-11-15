@@ -41,4 +41,5 @@ interface IJLoan {
     function getShareholderPlace(uint _id, address _holder) external view returns (uint);
     function addLoanShareholders(uint _id, address _newShareholder, uint _amount) external returns (uint);
     function addLoanShareholdersMassive(uint _id, address[] calldata _newShareholder, uint[] calldata _amount) external returns (bool success);
+    function addShareholderToMultipleLoans(uint[] calldata _ids, address _newShareholder, uint[] calldata _amounts) external returns (bool success);
 }

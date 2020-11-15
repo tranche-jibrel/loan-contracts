@@ -7,18 +7,17 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/math/Math.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/math/Math.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "./IJLoanCommons.sol";
 import "./IJLoan.sol";
 import "./IJFactory.sol";
 import "./TransferHelper.sol";
 import "./IJPriceOracle.sol";
 
-contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
+contract JLoan is OwnableUpgradeSafe, IJLoanCommons, IJLoan {
     using SafeMath for uint;
 
     address public feesCollector;
@@ -31,6 +30,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
 
     uint public loanId;
     bool public fLock;
+    bool public fLockAux;
 
     GeneralParams public generalLoansParams;
     FeesParams public loanFees;
@@ -64,7 +64,8 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     event AddShareholderShares(uint id, address indexed sharesBuyer, uint indexed amount);
     event InterestsWithdrawed(uint id, uint accruedInterests);
 
-    constructor(address _factoryAddress, address _feesCollector) public payable {
+    function initialize(address _factoryAddress, address _feesCollector) public initializer() {
+        OwnableUpgradeSafe.__Ownable_init();
         generalLoansParams = IJFactory(_factoryAddress).getGeneralParams();
         loanFees = IJFactory(_factoryAddress).getGeneralFees();
         feesCollector = payable(_feesCollector);
@@ -103,7 +104,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @param _borrowedAskAmount ERC20 address
     * @param _rpbRate token amount
     */
-    function openNewLoan(uint _pairId, uint _borrowedAskAmount, uint _rpbRate) external override payable nonReentrant {
+    function openNewLoan(uint _pairId, uint _borrowedAskAmount, uint _rpbRate) external override payable {
+        require(!fLock, "locked");
+        fLock = true;
         require(msg.sender!=address(0), "_senderZeroAddress");
         uint256 totalCollateralRequest = IJFactory(generalLoansParams.factoryAddress).calcMinCollateralWithFeesAmount(_pairId, _borrowedAskAmount);
         uint collAmount;
@@ -129,6 +132,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
         loanId = loanId.add(1);
         if (collateralToken != address(0))
             TransferHelper.safeTransferFrom(collateralToken, msg.sender, address(this), totalCollateralRequest);
+        fLock = false;
     }
 
     /**
@@ -158,13 +162,16 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @dev deposit collateral
     * @param _id loan id
     */
-    function depositEthCollateral(uint _id) external override payable nonReentrant {
+    function depositEthCollateral(uint _id) external override payable {
+        require(!fLock, "locked");
+        fLock = true;
         require(getCollateralTokenAddress(loanPair[_id]) == address(0), "!ETHLoan");
         require(loanStatus[_id] <= Status.foreclosing, "!Status04");
         loanBalance[_id] = loanBalance[_id].add(msg.value);
         loanLastDepositBlock[_id] = block.number;
         uint status = setLoanStatusOnCollRatio(_id);
         emit CollateralReceived(_id, loanPair[_id], msg.sender, msg.value, status);
+        fLock = false;
     }
 
     /**
@@ -173,7 +180,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @param _tok ERC20 address
     * @param _amount token amount
     */
-    function depositTokenCollateral(uint _id, address _tok, uint _amount) external override nonReentrant {
+    function depositTokenCollateral(uint _id, address _tok, uint _amount) external override {
+        require(!fLock, "locked");
+        fLock = true;
         address collateralToken = getCollateralTokenAddress(loanPair[_id]);
         require(collateralToken != address(0), "!TokenLoan");
         require(loanStatus[_id] <= Status.foreclosing, "!Status04");
@@ -185,6 +194,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
         uint status = setLoanStatusOnCollRatio(_id);
         emit CollateralReceived(_id, loanPair[_id], msg.sender, _amount, status);
         TransferHelper.safeTransferFrom(_tok, msg.sender, address(this), _amount);
+        fLock = false;
     }
 
     /**
@@ -192,7 +202,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @param _id loan id
     * @param _amount eth amount
     */
-    function withdrawCollateral(uint _id, uint _amount) external override nonReentrant {
+    function withdrawCollateral(uint _id, uint _amount) external override {
+        require(!fLock, "locked");
+        fLock = true;
         require(loanBorrower[_id] == msg.sender, "!borrower");
         uint status = setLoanStatusOnCollRatio(_id);
         require(status <= 1, "!Status01");
@@ -206,6 +218,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
             TransferHelper.safeTransferETH(msg.sender, _amount);
         else
             TransferHelper.safeTransfer(collateralToken, msg.sender, _amount);
+        fLock = false;
     }
 
     /**
@@ -328,7 +341,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @param _id loan id
     * @param _stableAddr, address of the stabl coin address
     */
-    function lenderSendStableCoins(uint _id, address _stableAddr) external override nonReentrant {
+    function lenderSendStableCoins(uint _id, address _stableAddr) external override {
+        require(!fLock, "locked");
+        fLock = true;
         address collateralToken = getCollateralTokenAddress(loanPair[_id]);
         address lentToken = getLentTokenAddress(loanPair[_id]);
         require(_stableAddr == lentToken, "!TokenOk");
@@ -354,6 +369,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
             TransferHelper.safeTransferETH(payable(feesCollector), fees4Factory);
         else
             TransferHelper.safeTransfer(collateralToken, feesCollector, fees4Factory);
+        fLock = false;
     }
 
     //// Status 1 or 2 or 3 or 4, based on collateral ratio
@@ -390,7 +406,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @dev set the loan in foreclosure state for undercollateralized loans
     * @param _id loan id
     */
-    function initiateLoanForeclose(uint _id) external override nonReentrant {
+    function initiateLoanForeclose(uint _id) external override {
+        require(!fLock, "locked");
+        fLock = true;
         uint status = setLoanStatusOnCollRatio(_id);
         require(status == 2 || status == 3, "!Status23");
         uint reward;
@@ -423,6 +441,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
             TransferHelper.safeTransfer(collateralToken, msg.sender, userReward);
             TransferHelper.safeTransfer(collateralToken, feesCollector, vaultReward);
         }
+        fLock = false;
     }
 
     //// Status 2 -> 4
@@ -441,7 +460,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @param _id loan id
     * @return bool 
     */
-    function setLoanToForeclosed(uint _id) external override nonReentrant returns (bool) {
+    function setLoanToForeclosed(uint _id) external override returns (bool) {
+        require(!fLock, "locked");
+        fLock = true;
         require(uint(loanStatus[_id]) == 4, "!Status4");
         bool result = false;
         if (loanForeclosingBlock[_id] != 0) {
@@ -473,6 +494,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
                 }
             }
         }
+        fLock = false;
         return result;
     }
 
@@ -509,7 +531,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @dev settle the loan in normal closing state by borrower
     * @param _id loan id
     */
-    function loanClosingByBorrower(uint _id) external override nonReentrant {
+    function loanClosingByBorrower(uint _id) external override {
+        require(!fLock, "locked");
+        fLock = true;
         require(loanBorrower[_id] == msg.sender, "!borrower");
         uint status = setLoanStatusOnCollRatio(_id);
         require(status > 0 && status <= 3, "!Status13");
@@ -547,6 +571,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
             TransferHelper.safeTransfer(collateralToken, msg.sender, withdrawalBalance);
             TransferHelper.safeTransfer(collateralToken, feesCollector, feesAmount);
         }
+        fLock = false;
     }
 
     /**
@@ -580,7 +605,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @dev set the loan in cancelled state (only if pending)
     * @param _id loan id
     */
-    function setLoanCancelled(uint _id) external override nonReentrant {
+    function setLoanCancelled(uint _id) external override {
+        require(!fLock, "locked");
+        fLock = true;
         require(loanBorrower[_id] == msg.sender, "!borrower");
         require(uint(loanStatus[_id]) == 0, "!Status0");
         uint bal = loanBalance[_id];
@@ -597,6 +624,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
             TransferHelper.safeTransfer(collateralToken, feesCollector, feeCanc);
             TransferHelper.safeTransfer(collateralToken, msg.sender, withdrawalBalance);
         }
+        fLock = false;
     }
 
 
@@ -640,7 +668,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @param _id loan id
     * @return uint new status
     */
-    function withdrawInterests(uint _id) public override nonReentrant returns (uint) {
+    function withdrawInterests(uint _id) public override returns (uint) {
+        require(!fLock, "locked");
+        fLock = true;
         // interests of all shareholders must be withdrawn with their shares amount
         require(uint(loanStatus[_id]) > 0 && uint(loanStatus[_id]) < 8, "!Status17" );
         uint status = uint(loanStatus[_id]);
@@ -665,6 +695,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
             status = uint(loanStatus[_id]);
         }
         emit InterestsWithdrawed(_id, accruedTotalInterests);
+        fLock = false;
         return status;
     }
 
@@ -675,13 +706,13 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     */
     function withdrawInterestsMassive(uint[] memory _id) external override returns (bool success) {
         require(_id.length <= 100, "TooMuchLoans");
-        require(!fLock, "Locked");
-        fLock = true;
+        require(!fLockAux, "Locked");
+        fLockAux = true;
         for (uint8 j = 0; j < _id.length; j++) {
             uint presentId = _id[j];
             withdrawInterests(presentId);
         }
-        fLock = false;
+        fLockAux = false;
         return true;
     }
 
@@ -732,7 +763,9 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     * @param _amount amount of shares
     * @return uint new status
     */
-    function addLoanShareholders(uint _id, address _newShareholder, uint _amount) public override nonReentrant returns (uint) {
+    function addLoanShareholders(uint _id, address _newShareholder, uint _amount) public override returns (uint) {
+        require(!fLock, "locked");
+        fLock = true;
         require(isShareholder(_id, msg.sender), "!shareholder");
         uint shPlace = getShareholderPlace(_id, msg.sender);
         require(shPlace > 0, "!shPlace");
@@ -757,6 +790,7 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
         }
         lastInterestWithdrawalBlock[_id] = block.number;
         uint status = setLoanStatusOnCollRatio(_id);
+        fLock = false;
         return status;
     }
 
@@ -770,12 +804,31 @@ contract JLoan is Ownable, ReentrancyGuard, IJLoanCommons, IJLoan {
     function addLoanShareholdersMassive(uint _id, address[] memory _newShareholder, uint[] memory _amount) external override returns (bool success) {
         require(_newShareholder.length <= 100, "TooMuchShareholders");
         require(_newShareholder.length == _amount.length, "!sameLength");
-        require(!fLock, "Locked");
-        fLock = true;
+        require(!fLockAux, "Locked");
+        fLockAux = true;
         for (uint8 j = 0; j < _newShareholder.length; j++) {
             address presentSH = _newShareholder[j];
             uint presentAmnt = _amount[j];
             addLoanShareholders(_id, presentSH, presentAmnt);
+        }
+        fLockAux = false;
+        return true;
+    }
+
+    /**
+    * @dev add one shareholder for multiple loans
+    * @param _ids loan ids
+    * @param _newShareholder shareholder address
+    * @param _amounts amount of shares array
+    * @return success boolean
+    */
+    function addShareholderToMultipleLoans(uint[] memory _ids, address _newShareholder, uint[] memory _amounts) external override returns (bool success) {
+        require(_newShareholder.length <= 100, "TooMuchShareholders");
+        require(_ids.length == _amounts.length, "JLoan: Arrays should be of the same length");
+        require(!fLockAux, "Locked");
+        fLockAux = true;
+        for (uint8 j = 0; j < _ids.length; j++) {
+            addLoanShareholders(_ids[j], _newShareholder, _amounts[j]);
         }
         fLock = false;
         return true;

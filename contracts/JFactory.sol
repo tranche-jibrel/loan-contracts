@@ -7,17 +7,16 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "./IJLoanCommons.sol";
 import "./IJLoanDeployer.sol";
 import "./IJLoan.sol";
 import "./IJPriceOracle.sol";
 import "./IJFactory.sol";
 
-contract JFactory is Ownable, ReentrancyGuard, IJLoanCommons, IJFactory { 
+contract JFactory is OwnableUpgradeSafe, IJLoanCommons, IJFactory { 
     using SafeMath for uint256;
 
     IJLoanDeployer public loanDeplContract;
@@ -35,12 +34,15 @@ contract JFactory is Ownable, ReentrancyGuard, IJLoanCommons, IJFactory {
 
     uint public factoryDeployBlock;
 
+    bool public fLock;
+
     event AdminAdded(address account);
     event AdminRemoved(address account);
     event NewLoanContractCreated(address indexed newLoan, uint counter);
     event SetNewStatus(uint idx, uint loanId, uint oldStatus, uint newStatus);
     
-    constructor(address _loanDepl, address _priceOracle) public {
+    function initialize(address _loanDepl, address _priceOracle) public initializer() {
+        OwnableUpgradeSafe.__Ownable_init();
         generalParams.earlySettlementWindow = 540000;
         generalParams.foreclosureWindow = 18000;
         generalParams.requiredCollateralRatio = 200;
@@ -287,11 +289,14 @@ contract JFactory is Ownable, ReentrancyGuard, IJLoanCommons, IJFactory {
     * @dev create a new loan contract and set the address in the mapping
     * @return address of the new contract
     */
-    function createNewLoanContract() external override nonReentrant onlyAdmins returns (address) {
+    function createNewLoanContract() external override onlyAdmins returns (address) {
+        require(!fLock, "locked");
+        fLock = true;
         address newTokenLoan = loanDeplContract.deployNewLoanContract(address(this));
         deployedLoans[loanCounter] = newTokenLoan;
         emit NewLoanContractCreated(newTokenLoan, loanCounter);
         loanCounter = loanCounter.add(1);
+        fLock = false;
         return newTokenLoan;
     }
 
@@ -334,7 +339,9 @@ contract JFactory is Ownable, ReentrancyGuard, IJLoanCommons, IJFactory {
     * @param _loanId loan id
     * @param _newStatus, new status
     */
-    function setStatusInLoan (uint _idx, uint _loanId, uint _newStatus) external override nonReentrant onlyOwner {
+    function setStatusInLoan (uint _idx, uint _loanId, uint _newStatus) external override onlyOwner {
+        require(!fLock, "locked");
+        fLock = true;
         require(_newStatus <= 7, "!Status07");
         IJLoan jContract = IJLoan(deployedLoans[_idx]);
         uint oldStatus = jContract.getLoanStatus(_loanId);
@@ -342,6 +349,7 @@ contract JFactory is Ownable, ReentrancyGuard, IJLoanCommons, IJFactory {
         jContract.setNewStatus(_loanId, _newStatus);
         uint newStatus = jContract.getLoanStatus(_loanId);
         emit SetNewStatus(_idx, _loanId, oldStatus, newStatus);
+        fLock = false;
     }
 
     /**

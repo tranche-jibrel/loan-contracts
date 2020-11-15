@@ -7,18 +7,20 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "./IJFactory.sol";
 import "./IJLoanCommons.sol";
 import "./JLoan.sol";
 import "./IJLoanDeployer.sol";
 
-contract JLoanDeployer is Ownable, IJLoanDeployer {
+contract JLoanDeployer is OwnableUpgradeSafe, IJLoanDeployer {
     address private feesCollector;
 
     IJLoanCommons.GeneralParams public loanParams;
 
-    constructor() public { }
+    function initialize() public initializer {
+        OwnableUpgradeSafe.__Ownable_init();
+    }
 
     modifier onlyLoanFactory() {
         require(msg.sender == loanParams.factoryAddress, "!factory");
@@ -39,7 +41,9 @@ contract JLoanDeployer is Ownable, IJLoanDeployer {
     * @return address of new pair contract
     */              
     function deployNewLoanContract(address _factAddr) external override onlyLoanFactory returns (address) {
-        address newLoanContract = address(new JLoan(_factAddr, feesCollector));
+        //address newLoanContract = address(new JLoan(_factAddr, feesCollector));
+        address newLoanContract = address(new JLoan());
+        JLoan(newLoanContract).initialize(_factAddr, feesCollector);
         return newLoanContract;
     }
 

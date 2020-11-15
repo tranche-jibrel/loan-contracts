@@ -1,4 +1,4 @@
-# Steps to deploy loans Factory 
+# Steps to deploy loans Factory Upgradeable
 #### a single wallet should deploy everything in this phase, because some function are marked as onlyOwner
 
 a) first the deployer should be deployed (JLoanDeployer)
@@ -45,3 +45,27 @@ Please note that amounts in calculation functions are expressed with all decimal
 
 Functions are provided to change values inside the JFactory contract.
 
+
+
+## Upgradeable contracts
+
+Please refer to the following guides:
+https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable
+https://simpleaswater.com/upgradable-smart-contracts/?ref=eth_stackexchange
+https://docs.nucypher.com/en/latest/architecture/upgradeable_proxy_contracts.html
+https://github.com/OpenZeppelin/openzeppelin-upgrades/blob/master/packages/plugin-truffle/README.md
+
+To upgrade contracts, you can use truffle or buidler:
+https://www.trufflesuite.com/blog/a-sweet-upgradeable-contract-experience-with-openzeppelin-and-truffle
+https://docs.openzeppelin.com/upgrades-plugins/1.x/
+
+Remeber to set optimizer to true in .openzeppelin/project.json, as well as to configure optimization when compiling.
+
+Please use:
+npx oz compile    	to compile contracts
+npx oz deploy		to deploy contracts, choosing if they should be upgradeable or not
+npx oz upgrade		to upgrade contracts
+
+or if you prefer truffle, please follow this guide: https://github.com/OpenZeppelin/openzeppelin-upgrades/blob/master/packages/plugin-truffle/README.md
+
+NB) remember to clean up ./openzeppelin folder when starting from scratch, the only file that should be present is "project.json"
