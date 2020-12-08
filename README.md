@@ -22,7 +22,7 @@ Tranche allows users to provide loans to other users, judging their credit-worth
 
 The first version of the borrowing and lending platform is currently live at on the Kovan Test Network and can be accessed using this link: https://testnet-v1.tranche.finance/
 
-You can go through the [Tranche Documentation](https://app.gitbook.com/@tranche/s/tranche-documentation/) to find user guides on how to use the.
+You can go through the [Tranche Documentation](https://app.gitbook.com/@tranche/s/tranche-documentation/) to find user guides on how to use the platform.
 
 ### Lending and Borrowing Smart Contracts
 
