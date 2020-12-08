@@ -5,24 +5,21 @@
  * @author: Jibrel Team
  */
 pragma solidity 0.6.12;
-pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 
-interface IJLoanCommons {
+contract JLoanStructs is OwnableUpgradeSafe {
     struct GeneralParams {
-        uint earlySettlementWindow;
-        uint foreclosureWindow;
+        uint256 earlySettlementWindow;
+        uint256 foreclosureWindow;
         uint8 requiredCollateralRatio;
         uint8 foreclosingRatio;
         uint8 instantForeclosureRatio;
         uint8 limitCollRatioForWithdraw;
-        address factoryAddress;
-        address loanDeployerAddress;
-        address priceOracleAddress;
     }
 
     struct FeesParams {
-        uint earlySettlementFee;
+        uint256 earlySettlementFee;
         uint8 factoryFees;
         uint8 userRewardShare;
         uint8 vaultRewardShare;
@@ -32,9 +29,9 @@ interface IJLoanCommons {
     }
 
     struct ContractParams {
-        uint rpbRate; 
-        uint initialCollateralRatio;
-        uint creationBlock;
+        uint256 rpbRate; 
+        uint256 initialCollateralRatio;
+        uint256 creationBlock;
     }
 
     enum Status {

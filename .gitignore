@@ -1,0 +1,10 @@
+.gitmodules
+node_modules/*
+old/
+package-lock.json
+.env
+yarn.lock
+TestContracts/
+build/
+.openzeppelin/dev*.json
+.openzeppelin/unknown*.json

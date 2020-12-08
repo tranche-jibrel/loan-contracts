@@ -1,3 +1,4 @@
+const { deployProxy, upgradeProxy } = require('@openzeppelin/truffle-upgrades');
 const { accounts, contract, web3 } = require('@openzeppelin/test-environment');
 const { BN, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 const { expect } = require('chai');
@@ -5,10 +6,9 @@ const { ZERO_ADDRESS } = constants;
 
 const myERC20 = contract.fromArtifact("myERC20");
 const JFeesCollector = contract.fromArtifact("JFeesCollector");
-const JLoanDeployer = contract.fromArtifact('JLoanDeployer');
 const JPriceOracle = contract.fromArtifact('JPriceOracle');
 const JLoan = contract.fromArtifact('JLoan');
-const JFactory = contract.fromArtifact("JFactory");
+const JLoanHelper = contract.fromArtifact("JLoanHelper"); //not upgradeable
 
 const MYERC20_TOKEN_SUPPLY = 5000000; 
 const GAS_PRICE = 27000000000;
@@ -157,25 +157,6 @@ function factoryInitialization (tokenOwner, factoryOwner, borrower3, borrower4, 
     console.log("JFeesCollector owner address: " + result);
   });
 
-  it('deploys JLoanDeployer', async function () {
-    this.JLoanDeployer = await JLoanDeployer.new({ from: factoryOwner });
-    tx = await web3.eth.getTransactionReceipt(this.JLoanDeployer.transactionHash);
-    expect(this.JLoanDeployer.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
-    console.log("JLoanDeployer deploy Gas: " + tx.gasUsed);
-    totcost = tx.gasUsed * GAS_PRICE;
-    console.log("JLoanDeployer deploy costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    expect(this.JLoanDeployer.address).to.be.not.equal(ZERO_ADDRESS);
-    expect(this.JLoanDeployer.address).to.match(/0x[0-9a-fA-F]{40}/);
-    console.log("JLoanDeployer address: " + this.JLoanDeployer.address);
-    tx = await this.JLoanDeployer.initialize({ from: factoryOwner });
-    console.log("JLoanDeployer Initialize Gas: " + tx.receipt.gasUsed);
-    totcost = tx.receipt.gasUsed * GAS_PRICE;
-    console.log("JLoanDeployer Initialize costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    result = await this.JLoanDeployer.owner();
-    expect(result).to.be.equal(factoryOwner);
-    console.log("JLoanDeployer owner address: " + result);
-  });
-
   it('deploys JPriceOracle', async function () {
     this.JPriceOracle = await JPriceOracle.new({ from: factoryOwner });
     tx = await web3.eth.getTransactionReceipt(this.JPriceOracle.transactionHash);
@@ -195,49 +176,23 @@ function factoryInitialization (tokenOwner, factoryOwner, borrower3, borrower4, 
     console.log("JPriceOracle owner address: " + result);
   });
 
-  it('deploys JFactory', async function () {
-    this.JFactory = await JFactory.new({ from: factoryOwner });
-    tx = await web3.eth.getTransactionReceipt(this.JFactory.transactionHash);
-    console.log("JFactory deploy Gas: " + tx.gasUsed);
+  it('deploys JLoanHelper', async function () {
+    this.JLoanHelper = await JLoanHelper.new(this.JPriceOracle.address, { from: factoryOwner });
+    tx = await web3.eth.getTransactionReceipt(this.JLoanHelper.transactionHash);
+    expect(this.JLoanHelper.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
+    console.log("JLoanHelper deploy Gas: " + tx.gasUsed);
     totcost = tx.gasUsed * GAS_PRICE;
-    console.log("JFactory deploy costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    expect(this.JFactory.address).to.be.not.equal(ZERO_ADDRESS);
-    expect(this.JFactory.address).to.match(/0x[0-9a-fA-F]{40}/);
-    console.log("JFactory address: " + this.JFactory.address);
-    tx = await this.JFactory.initialize(this.JLoanDeployer.address, this.JPriceOracle.address, { from: factoryOwner });
-    console.log("JFactory Initialize Gas: " + tx.receipt.gasUsed);
+    console.log("JLoanHelper deploy costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
+    expect(this.JLoanHelper.address).to.be.not.equal(ZERO_ADDRESS);
+    expect(this.JLoanHelper.address).to.match(/0x[0-9a-fA-F]{40}/);
+    console.log("JLoanHelper address: " + this.JLoanHelper.address);
+    /*tx = await this.JLoanHelper.initialize(this.JPriceOracle.address, { from: factoryOwner });
+    console.log("JLoanHelper Initialize Gas: " + tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
-    console.log("JFactory Initialize costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    result = await this.JFactory.owner();
+    console.log("JLoanHelper Initialize costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");*/
+    result = await this.JLoanHelper.owner();
     expect(result).to.be.equal(factoryOwner);
-    console.log("JFactory owner address: " + result);
-  });
-
-  it('set factory and fees collector address in deployers and price oracle', async function () {
-    var tx = await this.JLoanDeployer.setLoanFactory(this.JFactory.address, {from: factoryOwner});
-    expect(tx.receipt.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
-    console.log(tx.receipt.gasUsed);
-    totcost = tx.receipt.gasUsed * GAS_PRICE;
-    console.log(web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-
-    tx = await this.JLoanDeployer.setFeesCollector(this.JFeesCollector.address, {from: factoryOwner});
-    expect(tx.receipt.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
-    console.log(tx.receipt.gasUsed);
-    totcost = tx.receipt.gasUsed * GAS_PRICE;
-    console.log(web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-
-    tx = await this.JPriceOracle.setFactoryAddress(this.JFactory.address, {from: factoryOwner});
-    expect(tx.receipt.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
-    console.log(tx.receipt.gasUsed);
-    totcost = tx.receipt.gasUsed * GAS_PRICE;
-    console.log(web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-
-    var getParams = await this.JLoanDeployer.loanParams();
-    expect(getParams.factoryAddress).to.be.equal(this.JFactory.address);
-    var getFeesColl = await this.JLoanDeployer.getFeesCollector();
-    expect(getFeesColl).to.be.equal(this.JFeesCollector.address);
-    var getFactory = await this.JPriceOracle.factoryAddress();
-    expect(getFactory).to.be.equal(this.JFactory.address);
+    console.log("JLoanHelper owner address: " + result);
   });
 
   it('set new ETH pairs in price oracle contract', async function () {
@@ -290,20 +245,20 @@ function factoryInitialization (tokenOwner, factoryOwner, borrower3, borrower4, 
     console.log(await this.JPriceOracle.getPairQuoteAddress(1));
   });
 
-  it('set new admin in factory contract', async function () {
-    tx = await this.JFactory.addAdmin(factoryAdmin, {from: factoryOwner});
+  it('set new admin in Price oracle contract', async function () {
+    tx = await this.JPriceOracle.addAdmin(factoryAdmin, {from: factoryOwner});
     expect(tx.receipt.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("New admin costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    expect(await this.JFactory.isAdmin(factoryAdmin)).to.be.true;
+    expect(await this.JPriceOracle.isAdmin(factoryAdmin)).to.be.true;
   });
 
   it('owner set again the same address as admin', async function () {
-    await expectRevert(this.JFactory.addAdmin(factoryAdmin, {from: factoryOwner}), "Address already Administrator.");
+    await expectRevert(this.JPriceOracle.addAdmin(factoryAdmin, {from: factoryOwner}), "Address already Administrator.");
   });
 
-  it('owner set new price in price oracle contract', async function () {
+  it('owner set new price in price oracle contract fro pair 0', async function () {
     tx = await this.JPriceOracle.setPairValue(0, 35885, 2, {from: factoryOwner});
     expect(tx.receipt.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
     console.log(tx.receipt.gasUsed);
@@ -314,7 +269,7 @@ function factoryInitialization (tokenOwner, factoryOwner, borrower3, borrower4, 
     expect(result).to.be.bignumber.equal(pair.pairValue);
   });
 
-  it('owner set new price in price oracle contract', async function () {
+  it('owner set new price in price oracle contract for pair 1', async function () {
     tx = await this.JPriceOracle.setPairValue(1, 16785, 6, {from: factoryOwner});
     expect(tx.receipt.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
     console.log(tx.receipt.gasUsed);
@@ -325,18 +280,23 @@ function factoryInitialization (tokenOwner, factoryOwner, borrower3, borrower4, 
     expect(result).to.be.bignumber.equal(pair.pairValue);
   });
 
-  it('admin deploys new loan contract', async function () {
-    tx = await this.JFactory.createNewLoanContract({from: factoryAdmin})
-    console.log(tx.receipt.gasUsed);
+  it('admin deploys loan contract', async function () {
+    this.JLoan = await JLoan.new({ from: factoryOwner });
+    tx = await web3.eth.getTransactionReceipt(this.JLoan.transactionHash);
+    expect(this.JLoan.transactionHash).to.match(/0x[0-9a-fA-F]{64}/);
+    console.log("JLoan deploy Gas: " + tx.gasUsed);
+    totcost = tx.gasUsed * GAS_PRICE;
+    console.log("JLoan deploy costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
+    expect(this.JLoan.address).to.be.not.equal(ZERO_ADDRESS);
+    expect(this.JLoan.address).to.match(/0x[0-9a-fA-F]{40}/);
+    console.log("JLoanHelper address: " + this.JLoan.address);
+    tx = await this.JLoan.initialize(this.JPriceOracle.address, this.JFeesCollector.address, this.JLoanHelper.address, { from: factoryOwner });
+    console.log("JLoan Initialize Gas: " + tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
-    console.log("New pair contract deploy costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    loanPairAddress = await this.JFactory.getDeployedLoan(0);
-    this.loanContract = await JLoan.at(loanPairAddress);
-    console.log("loanContract address: " + this.loanContract.address);
-    expect(this.loanContract.address).to.be.not.equal(ZERO_ADDRESS);
-    expect(this.loanContract.address).to.match(/0x[0-9a-fA-F]{40}/);
-    pairName = await this.JPriceOracle.getPairName(0);
-    expect(pairName).to.be.equal("ETHDAI");
+    console.log("JLoan Initialize costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
+    result = await this.JLoan.owner();
+    expect(result).to.be.equal(factoryOwner);
+    console.log("JLoan owner address: " + result);
   });
 
 }
@@ -348,60 +308,60 @@ function borrowersOpenLoans (factoryOwner, borrower1, borrower2, borrower3, borr
     console.log(`borrower1 address: ${borrower1}`);
     var borrBal = await web3.eth.getBalance(borrower1);
     console.log(`New borrower1 Balance: ${web3.utils.fromWei(borrBal, "ether")} ETH`);
-    collAmount = await this.JFactory.calcMinCollateralWithFeesAmount(0, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), {from: borrower1})
+    collAmount = await this.JLoan.getMinCollateralWithFeesAmount(0, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), {from: borrower1})
     console.log(`Min Collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} ETH`);
     true;
   });
 
   it('borrower1 open a loan asking STABLE_COIN_AMOUNT1 tokens', async function () {
-    console.log("JFactory address: " + this.JFactory.address);
-    console.log("loanContract address: " + this.loanContract.address);
-    collAmount = await this.JFactory.calcMinCollateralWithFeesAmount(0, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), {from: borrower1})
+    console.log("JLoanHelper address: " + this.JLoanHelper.address);
+    console.log("JLoan address: " + this.JLoan.address);
+    collAmount = await this.JLoan.getMinCollateralWithFeesAmount(0, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), {from: borrower1})
     console.log(`Min collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} ETH`);
-    tx = await this.loanContract.openNewLoan(0, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), LOAN_RPB_RATE, {from: borrower1, value: collAmount})
+    tx = await this.JLoan.openNewLoan(0, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), LOAN_RPB_RATE, {from: borrower1, value: collAmount})
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("New eth loan open costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(0);
+    contractBalance = await this.JLoan.getContractBalance(0);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(0);
+    loanBalance = await this.JLoan.getLoanBalance(0);
     console.log(`Loan 0 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
     var borrBal = await web3.eth.getBalance(borrower1);
     console.log(`New borrower1 Balance: ${web3.utils.fromWei(borrBal, "ether")} ETH`);
-    loansNum = await this.loanContract.loanId();
+    loansNum = await this.JLoan.loanId();
     expect(loansNum.toString()).to.be.equal(new BN(1).toString());
   });
 
   it('borrower2 open a loan asking STABLE_COIN_AMOUNT2 tokens', async function () {
     console.log(`borrower2 address: ${borrower2}`);
-    collAmount = await this.JFactory.calcMinCollateralWithFeesAmount(0, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), {from: borrower2})
+    collAmount = await this.JLoan.getMinCollateralWithFeesAmount(0, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), {from: borrower2})
     console.log(`Min collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} ETH`);
-    tx = await this.loanContract.openNewLoan(0, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), LOAN_RPB_RATE, {from: borrower2, value: collAmount})
+    tx = await this.JLoan.openNewLoan(0, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), LOAN_RPB_RATE, {from: borrower2, value: collAmount})
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("New eth loan open costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(1);
+    contractBalance = await this.JLoan.getContractBalance(1);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(1);
+    loanBalance = await this.JLoan.getLoanBalance(1);
     console.log(`Loan 1 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
     var borrBal = await web3.eth.getBalance(borrower2);
     console.log(`New borrower2 Balance: ${web3.utils.fromWei(borrBal, "ether")} ETH`);
-    loansNum = await this.loanContract.loanId();
+    loansNum = await this.JLoan.loanId();
     expect(loansNum.toString()).to.be.equal(new BN(2).toString());
   });
 
   it('borrower2 cannot open a loan on pair1 since he has no token for collateral', async function () {
     console.log(`borrower2 address: ${borrower2}`);
-    collAmount = await this.JFactory.calcMinCollateralWithFeesAmount(1, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), {from: borrower2})
+    collAmount = await this.JLoan.getMinCollateralWithFeesAmount(1, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), {from: borrower2})
     console.log(`Min collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} ETH`);
-    await expectRevert(this.loanContract.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), LOAN_RPB_RATE, {from: borrower2}), "!allowance");
-    tx = await this.erc20Coll1.approve(this.loanContract.address, collAmount, {from: borrower2});
+    await expectRevert(this.JLoan.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), LOAN_RPB_RATE, {from: borrower2}), "!allowance");
+    tx = await this.erc20Coll1.approve(this.JLoan.address, collAmount, {from: borrower2});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Borrower2 allowance costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    await expectRevert(this.loanContract.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), LOAN_RPB_RATE, {from: borrower2}), "TH TRANSFER_FROM_FAILED");
+    await expectRevert(this.JLoan.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), LOAN_RPB_RATE, {from: borrower2}), "TH TRANSFER_FROM_FAILED");
   });
 
   it('factory owner add token to fees collector contract', async function () {
@@ -416,27 +376,27 @@ function borrowersOpenLoans (factoryOwner, borrower1, borrower2, borrower3, borr
     console.log(`borrower3 address: ${borrower3}`);
     borrBal = await this.erc20Coll1.balanceOf(borrower3);
     console.log(`borrower3 Collateral Balance: ${web3.utils.fromWei(borrBal, "ether")} Coll Tokens`);
-    collAmount = await this.JFactory.calcMinCollateralWithFeesAmount(1, web3.utils.toWei(STABLE_COIN_AMOUNT3.toString(),'ether'), {from: borrower3});
+    collAmount = await this.JLoan.getMinCollateralWithFeesAmount(1, web3.utils.toWei(STABLE_COIN_AMOUNT3.toString(),'ether'), {from: borrower3});
     console.log(`Min collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} Coll.Tokens`);
-    tx = await this.erc20Coll1.approve(this.loanContract.address, collAmount, {from: borrower3});
-    console.log("borrower3 Allowance: " + await this.erc20Coll1.allowance(borrower3, this.loanContract.address));
+    tx = await this.erc20Coll1.approve(this.JLoan.address, collAmount, {from: borrower3});
+    console.log("borrower3 Allowance: " + await this.erc20Coll1.allowance(borrower3, this.JLoan.address));
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Borrower3 allowance costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expect(tx.receipt.status).to.be.true;
     console.log(`Min collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} Coll.Tokens`);
-    tx = await this.loanContract.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT3.toString(),'ether'), LOAN_RPB_RATE, {from: borrower3})
+    tx = await this.JLoan.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT3.toString(),'ether'), LOAN_RPB_RATE, {from: borrower3})
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("New token loan open costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(2);
+    contractBalance = await this.JLoan.getContractBalance(2);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} Coll.Tokens`);
-    loanBalance = await this.loanContract.getLoanBalance(2);
+    loanBalance = await this.JLoan.getLoanBalance(2);
     console.log(`Loan0 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} Coll.Tokens`);
     var borrBal = await this.erc20Coll1.balanceOf(borrower3);
     console.log(`New borrower3 Balance: ${web3.utils.fromWei(borrBal, "ether")} Coll.Tokens`);
-    loansNum = await this.loanContract.loanId();
+    loansNum = await this.JLoan.loanId();
     expect(loansNum.toString()).to.be.equal(new BN(3).toString());
   });
 
@@ -445,54 +405,54 @@ function borrowersOpenLoans (factoryOwner, borrower1, borrower2, borrower3, borr
     console.log(`borrower4 address: ${borrower4}`);
     borrBal = await this.erc20Coll1.balanceOf(borrower4);
     console.log(`borrower4 Collateral Balance: ${web3.utils.fromWei(borrBal, "ether")} Coll.Tokens`);
-    collAmount = await this.JFactory.calcMinCollateralWithFeesAmount(1, web3.utils.toWei(STABLE_COIN_AMOUNT4.toString(),'ether'), {from: borrower4});
+    collAmount = await this.JLoan.getMinCollateralWithFeesAmount(1, web3.utils.toWei(STABLE_COIN_AMOUNT4.toString(),'ether'), {from: borrower4});
     console.log(`Min collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} Coll.Tokens`);
-    tx = await this.erc20Coll1.approve(this.loanContract.address, collAmount, {from: borrower4});
+    tx = await this.erc20Coll1.approve(this.JLoan.address, collAmount, {from: borrower4});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Borrower4 allowance costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expect(tx.receipt.status).to.be.true;
     console.log(`Min collateral Amount: ${web3.utils.fromWei(collAmount, "ether")} Coll.Tokens`);
-    tx = await this.loanContract.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT4.toString(),'ether'), LOAN_RPB_RATE, {from: borrower4})
+    tx = await this.JLoan.openNewLoan(1, web3.utils.toWei(STABLE_COIN_AMOUNT4.toString(),'ether'), LOAN_RPB_RATE, {from: borrower4})
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("New eth loan open costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(3);
+    contractBalance = await this.JLoan.getContractBalance(3);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} Coll.Tokens`);
-    loanBalance = await this.loanContract.getLoanBalance(3);
+    loanBalance = await this.JLoan.getLoanBalance(3);
     console.log(`Loan 1 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} Coll.Tokens`);
     var borrBal = await this.erc20Coll1.balanceOf(borrower4);
     console.log(`New borrower4 Balance: ${web3.utils.fromWei(borrBal, "ether")} Coll.Tokens`);
-    loansNum = await this.loanContract.loanId();
+    loansNum = await this.JLoan.loanId();
     expect(loansNum.toString()).to.be.equal(new BN(4).toString());
   });
 
   it('borrowers can send collateral to pending contract', async function () {
     collAmount = new BN(1000000000);
-    await expectRevert(web3.eth.sendTransaction({from: borrower1, to: this.loanContract.address, value: collAmount}), "revert");
-    tx = await this.loanContract.depositEthCollateral(0, {from: borrower1, value: collAmount});
+    await expectRevert(web3.eth.sendTransaction({from: borrower1, to: this.JLoan.address, value: collAmount}), "revert");
+    tx = await this.JLoan.depositEthCollateral(0, {from: borrower1, value: collAmount});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Add collateral loan0 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(0);
+    contractBalance = await this.JLoan.getContractBalance(0);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(0);
+    loanBalance = await this.JLoan.getLoanBalance(0);
     console.log(`Loan1 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
     
-    tx = await this.erc20Coll1.approve(this.loanContract.address, collAmount, {from: borrower4});
+    tx = await this.erc20Coll1.approve(this.JLoan.address, collAmount, {from: borrower4});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Borrower4 allowance costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    tx = await this.loanContract.depositTokenCollateral(3, this.erc20Coll1.address, collAmount, {from: borrower4});
+    tx = await this.JLoan.depositTokenCollateral(3, this.erc20Coll1.address, collAmount, {from: borrower4});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Add collateral loan3 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(3);
+    contractBalance = await this.JLoan.getContractBalance(3);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} Coll. Tokens`);
-    loanBalance = await this.loanContract.getLoanBalance(3);
+    loanBalance = await this.JLoan.getLoanBalance(3);
     console.log(`Loan3 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
   });
 }
@@ -503,18 +463,18 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
   it('lender1 sends stable coins to loan0', async function () {
     var lenderBal = await this.erc20Lent1.balanceOf(lender1);
     console.log(`Lender1 Stable coins Balance: ${web3.utils.fromWei(lenderBal, "ether")} Stable coins`)
-    await this.erc20Lent1.approve(this.loanContract.address, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), {from: lender1});
-    console.log("Lender1 Allowance: " + await this.erc20Lent1.allowance(lender1, this.loanContract.address))
-    tx = await this.loanContract.lenderSendStableCoins(0, this.erc20Lent1.address, {from: lender1});
+    await this.erc20Lent1.approve(this.JLoan.address, web3.utils.toWei(STABLE_COIN_AMOUNT1.toString(),'ether'), {from: lender1});
+    console.log("Lender1 Allowance: " + await this.erc20Lent1.allowance(lender1, this.JLoan.address))
+    tx = await this.JLoan.lenderSendStableCoins(0, this.erc20Lent1.address, {from: lender1});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender1 send stable coins to loan 0 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "LoanStatusChanged");
-    loanStatus0 = await this.loanContract.getLoanStatus(0);
+    loanStatus0 = await this.JLoan.getLoanStatus(0);
     console.log("Loan 0 Status:" + loanStatus0);
-    loanStatus1 = await this.loanContract.getLoanStatus(1);
+    loanStatus1 = await this.JLoan.getLoanStatus(1);
     console.log("Loan 1 Status:" + loanStatus1);
-    contractBalance = await this.loanContract.getContractBalance(0);
+    contractBalance = await this.JLoan.getContractBalance(0);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
     JFeesCollBalance = await this.JFeesCollector.getEthBalance();
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} ETH`);
@@ -533,11 +493,11 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
 
   it('lender1 is a shareholder of loan0', async function () {
     console.log("Lender Address: " + lender1);
-    tx = await this.loanContract.isShareholder(0, lender1);
+    tx = await this.JLoan.isShareholder(0, lender1);
     expect(tx).to.be.true;
-    tx = await this.loanContract.getShareholderPlace(0, lender1);
+    tx = await this.JLoan.getShareholderPlace(0, lender1);
     expect(tx.toString()).to.be.equal(new BN(1).toString());
-    tx = await this.loanContract.loanShareholders(0, 1);
+    tx = await this.JLoan.loanShareholders(0, 1);
     expect(tx.holder).to.be.equal(lender1);
     expect((tx.shares).toString()).to.be.equal(new BN(100).toString());
   });
@@ -545,17 +505,17 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
   it('lender1 send stable coins to loan1', async function () {
     var lenderBal = await this.erc20Lent1.balanceOf(lender1);
     console.log(`Lender1 Stable coins Balance: ${web3.utils.fromWei(lenderBal, "ether")} Stable coins`)
-    await this.erc20Lent1.approve(this.loanContract.address, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), {from: lender1});
-    console.log("Lender1 Allowance: " + await this.erc20Lent1.allowance(lender1, this.loanContract.address))
-    tx = await this.loanContract.lenderSendStableCoins(1, this.erc20Lent1.address, {from: lender1});
+    await this.erc20Lent1.approve(this.JLoan.address, web3.utils.toWei(STABLE_COIN_AMOUNT2.toString(),'ether'), {from: lender1});
+    console.log("Lender1 Allowance: " + await this.erc20Lent1.allowance(lender1, this.JLoan.address))
+    tx = await this.JLoan.lenderSendStableCoins(1, this.erc20Lent1.address, {from: lender1});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender1 send stable coins to loan 1 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    loanStatus0 = await this.loanContract.getLoanStatus(0);
+    loanStatus0 = await this.JLoan.getLoanStatus(0);
     console.log("Loan 0 Status:" + loanStatus0);
-    loanStatus1 = await this.loanContract.getLoanStatus(1);
+    loanStatus1 = await this.JLoan.getLoanStatus(1);
     console.log("Loan 1 Status:" + loanStatus1);
-    contractBalance = await this.loanContract.getContractBalance(1);
+    contractBalance = await this.JLoan.getContractBalance(1);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
     JFeesCollBalance = await this.JFeesCollector.getEthBalance();
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} ETH`);
@@ -574,11 +534,11 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
 
   it('lender1 is a shareholder of loan1', async function () {
     console.log("Lender Address: " + lender1);
-    tx = await this.loanContract.isShareholder(1, lender1);
+    tx = await this.JLoan.isShareholder(1, lender1);
     expect(tx).to.be.true;
-    tx = await this.loanContract.getShareholderPlace(1, lender1);
+    tx = await this.JLoan.getShareholderPlace(1, lender1);
     expect(tx.toString()).to.be.equal(new BN(1).toString());
-    tx = await this.loanContract.loanShareholders(1, 1);
+    tx = await this.JLoan.loanShareholders(1, 1);
     expect(tx.holder).to.be.equal(lender1);
     expect((tx.shares).toString()).to.be.equal(new BN(100).toString());
   });
@@ -586,18 +546,18 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
   it('lender2 sends stable coins to loan2', async function () {
     var lenderBal = await this.erc20Lent2.balanceOf(lender2);
     console.log(`Lender2 Stable coins Balance: ${web3.utils.fromWei(lenderBal, "ether")} Stable coins`)
-    await this.erc20Lent2.approve(this.loanContract.address, web3.utils.toWei(STABLE_COIN_AMOUNT3.toString(),'ether'), {from: lender2});
-    console.log("Lender2 Allowance: " + await this.erc20Lent2.allowance(lender2, this.loanContract.address))
-    tx = await this.loanContract.lenderSendStableCoins(2, this.erc20Lent2.address, {from: lender2});
+    await this.erc20Lent2.approve(this.JLoan.address, web3.utils.toWei(STABLE_COIN_AMOUNT3.toString(),'ether'), {from: lender2});
+    console.log("Lender2 Allowance: " + await this.erc20Lent2.allowance(lender2, this.JLoan.address))
+    tx = await this.JLoan.lenderSendStableCoins(2, this.erc20Lent2.address, {from: lender2});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender2 send stable coins to loan 2 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "LoanStatusChanged");
-    loanStatus2 = await this.loanContract.getLoanStatus(2);
+    loanStatus2 = await this.JLoan.getLoanStatus(2);
     console.log("Loan 2 Status:" + loanStatus2);
-    loanStatus3 = await this.loanContract.getLoanStatus(3);
+    loanStatus3 = await this.JLoan.getLoanStatus(3);
     console.log("Loan 3 Status:" + loanStatus3);
-    contractBalance = await this.loanContract.getContractBalance(2);
+    contractBalance = await this.JLoan.getContractBalance(2);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
     JFeesCollBalance = await this.JFeesCollector.getEthBalance();
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} ETH`);
@@ -616,11 +576,11 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
 
   it('lender2 is a shareholder of loan2', async function () {
     console.log("Lender Address: " + lender2);
-    tx = await this.loanContract.isShareholder(2, lender2);
+    tx = await this.JLoan.isShareholder(2, lender2);
     expect(tx).to.be.true;
-    tx = await this.loanContract.getShareholderPlace(2, lender2);
+    tx = await this.JLoan.getShareholderPlace(2, lender2);
     expect(tx.toString()).to.be.equal(new BN(1).toString());
-    tx = await this.loanContract.loanShareholders(2, 1);
+    tx = await this.JLoan.loanShareholders(2, 1);
     expect(tx.holder).to.be.equal(lender2);
     expect((tx.shares).toString()).to.be.equal(new BN(100).toString());
   });
@@ -628,17 +588,17 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
   it('lender2 send stable coins to loan3', async function () {
     var lenderBal = await this.erc20Lent2.balanceOf(lender2);
     console.log(`Lender2 Stable coins Balance: ${web3.utils.fromWei(lenderBal, "ether")} Stable coins`)
-    await this.erc20Lent2.approve(this.loanContract.address, web3.utils.toWei(STABLE_COIN_AMOUNT4.toString(),'ether'), {from: lender2});
-    console.log("Lender Allowance: " + await this.erc20Lent2.allowance(lender2, this.loanContract.address))
-    tx = await this.loanContract.lenderSendStableCoins(3, this.erc20Lent2.address, {from: lender2});
+    await this.erc20Lent2.approve(this.JLoan.address, web3.utils.toWei(STABLE_COIN_AMOUNT4.toString(),'ether'), {from: lender2});
+    console.log("Lender Allowance: " + await this.erc20Lent2.allowance(lender2, this.JLoan.address))
+    tx = await this.JLoan.lenderSendStableCoins(3, this.erc20Lent2.address, {from: lender2});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender2 send stable coins to loan 3 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    loanStatus2 = await this.loanContract.getLoanStatus(2);
+    loanStatus2 = await this.JLoan.getLoanStatus(2);
     console.log("Loan 2 Status:" + loanStatus2);
-    loanStatus3 = await this.loanContract.getLoanStatus(3);
+    loanStatus3 = await this.JLoan.getLoanStatus(3);
     console.log("Loan 3 Status:" + loanStatus3);
-    contractBalance = await this.loanContract.getContractBalance(3);
+    contractBalance = await this.JLoan.getContractBalance(3);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
     JFeesCollBalance = await this.JFeesCollector.getEthBalance();
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} ETH`);
@@ -657,11 +617,11 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
 
   it('lender2 is a shareholder of loan3', async function () {
     console.log("Lender Address: " + lender2);
-    tx = await this.loanContract.isShareholder(3, lender2);
+    tx = await this.JLoan.isShareholder(3, lender2);
     expect(tx).to.be.true;
-    tx = await this.loanContract.getShareholderPlace(3, lender2);
+    tx = await this.JLoan.getShareholderPlace(3, lender2);
     expect(tx.toString()).to.be.equal(new BN(1).toString());
-    tx = await this.loanContract.loanShareholders(3, 1);
+    tx = await this.JLoan.loanShareholders(3, 1);
     expect(tx.holder).to.be.equal(lender2);
     expect((tx.shares).toString()).to.be.equal(new BN(100).toString());
   });
@@ -670,81 +630,81 @@ function lendersActivateLoans (borrower1, borrower2, borrower3, borrower4, lende
 
 function borrowersAddCollateral(borrower1, borrower2, borrower3, borrower4) {
   it('borrower1 can send collateral to active loans', async function () {
-    console.log("Loan 0 collateral ratio: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("Loan 1 collateral ratio: " + await this.loanContract.getActualCollateralRatio(1));
+    console.log("Loan 0 collateral ratio: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("Loan 1 collateral ratio: " + await this.JLoan.getActualCollateralRatio(1));
     ten_eth = new BN(web3.utils.toWei('10', "ether"));
-    tx = await this.loanContract.depositEthCollateral(0, {from: borrower1, value: ten_eth});
+    tx = await this.JLoan.depositEthCollateral(0, {from: borrower1, value: ten_eth});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("borrower1 adding collateral costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    contractBalance = await this.loanContract.getContractBalance(0);
+    contractBalance = await this.JLoan.getContractBalance(0);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(0);
+    loanBalance = await this.JLoan.getLoanBalance(0);
     console.log(`Loan0 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(1);
+    loanBalance = await this.JLoan.getLoanBalance(1);
     console.log(`Loan1 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    console.log("New collateral ratio loan0: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("New collateral ratio loan1: " + await this.loanContract.getActualCollateralRatio(1));
+    console.log("New collateral ratio loan0: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("New collateral ratio loan1: " + await this.JLoan.getActualCollateralRatio(1));
   });
 
   it('borrower2 can send collateral to active loans', async function () {
-    console.log("Loan 0 collateral ratio: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("Loan 1 collateral ratio: " + await this.loanContract.getActualCollateralRatio(1));
+    console.log("Loan 0 collateral ratio: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("Loan 1 collateral ratio: " + await this.JLoan.getActualCollateralRatio(1));
     ten_eth = new BN(web3.utils.toWei('10', "ether"));
-    tx = await this.loanContract.depositEthCollateral(1, {from: borrower2, value: ten_eth});
+    tx = await this.JLoan.depositEthCollateral(1, {from: borrower2, value: ten_eth});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("borrower2 adding collateral costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    contractBalance = await this.loanContract.getContractBalance(1);
+    contractBalance = await this.JLoan.getContractBalance(1);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(0);
+    loanBalance = await this.JLoan.getLoanBalance(0);
     console.log(`Loan0 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(1);
+    loanBalance = await this.JLoan.getLoanBalance(1);
     console.log(`Loan1 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    console.log("New collateral ratio loan0: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("New collateral ratio loan1: " + await this.loanContract.getActualCollateralRatio(1));
+    console.log("New collateral ratio loan0: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("New collateral ratio loan1: " + await this.JLoan.getActualCollateralRatio(1));
   });
 
   it('borrower3 can send token collateral to active contract', async function () {
-    console.log("Loan2 collateral ratio: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("Loan3 collateral ratio: " + await this.loanContract.getActualCollateralRatio(3));
+    console.log("Loan2 collateral ratio: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("Loan3 collateral ratio: " + await this.JLoan.getActualCollateralRatio(3));
     tenth_tok = web3.utils.toWei('10000', "ether");
-    tx = await this.erc20Coll1.approve(this.loanContract.address, tenth_tok, {from: borrower3});
+    tx = await this.erc20Coll1.approve(this.JLoan.address, tenth_tok, {from: borrower3});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("borrower3 approve costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    tx = await this.loanContract.depositTokenCollateral(2, this.erc20Coll1.address, tenth_tok, {from: borrower3});
+    tx = await this.JLoan.depositTokenCollateral(2, this.erc20Coll1.address, tenth_tok, {from: borrower3});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("borrower3 adding collateral costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(2);
+    contractBalance = await this.JLoan.getContractBalance(2);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} Collat. Coins`);
-    loanBal = await this.loanContract.getLoanBalance(2);
+    loanBal = await this.JLoan.getLoanBalance(2);
     console.log(`loan2 Balance: ${web3.utils.fromWei(loanBal.toString(), "ether")} Collat. Coins`);
-    console.log("New collateral ratio loan2: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("New collateral ratio loan3: " + await this.loanContract.getActualCollateralRatio(3));
+    console.log("New collateral ratio loan2: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("New collateral ratio loan3: " + await this.JLoan.getActualCollateralRatio(3));
   });
 
   it('borrower4 can send token collateral to active contract', async function () {
-    console.log("Loan2 collateral ratio: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("Loan3 collateral ratio: " + await this.loanContract.getActualCollateralRatio(3));
+    console.log("Loan2 collateral ratio: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("Loan3 collateral ratio: " + await this.JLoan.getActualCollateralRatio(3));
     tenth_tok = web3.utils.toWei('10000', "ether");
-    tx = await this.erc20Coll1.approve(this.loanContract.address, tenth_tok, {from: borrower4});
+    tx = await this.erc20Coll1.approve(this.JLoan.address, tenth_tok, {from: borrower4});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("borrower4 approve costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    tx = await this.loanContract.depositTokenCollateral(3, this.erc20Coll1.address, tenth_tok, {from: borrower4});
+    tx = await this.JLoan.depositTokenCollateral(3, this.erc20Coll1.address, tenth_tok, {from: borrower4});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("borrower4 adding collateral costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "CollateralReceived");
-    contractBalance = await this.loanContract.getContractBalance(3);
+    contractBalance = await this.JLoan.getContractBalance(3);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} Collat. Coins`);
-    loanBal = await this.loanContract.getLoanBalance(3);
+    loanBal = await this.JLoan.getLoanBalance(3);
     console.log(`loan3 Balance: ${web3.utils.fromWei(loanBal.toString(), "ether")} Collat. Coins`);
-    console.log("New collateral ratio loan2: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("New collateral ratio loan3: " + await this.loanContract.getActualCollateralRatio(3));
+    console.log("New collateral ratio loan2: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("New collateral ratio loan3: " + await this.JLoan.getActualCollateralRatio(3));
   });
 }
 
@@ -754,30 +714,30 @@ function lendersGetAccruedInterest(lender1, lender2) {
   it('lender1 can have accrued interests from loan0 and loan1 as per RPB', async function () {
     lenderBal = await web3.eth.getBalance(lender1);
     console.log(`Lender1 ETH Balance: ${web3.utils.fromWei(lenderBal, "ether")} ETH`)
-    console.log("Accrued interests loan0: " + await this.loanContract.getAccruedInterests(0));
-    console.log("Accrued interests loan1: " + await this.loanContract.getAccruedInterests(1));
-    contractBalance = await this.loanContract.getContractBalance(0);
+    console.log("Accrued interests loan0: " + await this.JLoan.getAccruedInterests(0));
+    console.log("Accrued interests loan1: " + await this.JLoan.getAccruedInterests(1));
+    contractBalance = await this.JLoan.getContractBalance(0);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(0);
+    loanBalance = await this.JLoan.getLoanBalance(0);
     console.log(`Loan0 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(1);
+    loanBalance = await this.JLoan.getLoanBalance(1);
     console.log(`Loan1 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    tx = await this.loanContract.withdrawInterests(0, {from: lender1});
+    tx = await this.JLoan.withdrawInterests(0, {from: lender1});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender withdraw interests from loan0 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    tx = await this.loanContract.withdrawInterests(1, {from: lender1});
+    tx = await this.JLoan.withdrawInterests(1, {from: lender1});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender withdraw interests from loan1 costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    contractBalance = await this.loanContract.getContractBalance(0);
+    contractBalance = await this.JLoan.getContractBalance(0);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(0);
+    loanBalance = await this.JLoan.getLoanBalance(0);
     console.log(`Loan 0 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    loanBalance = await this.loanContract.getLoanBalance(1);
+    loanBalance = await this.JLoan.getLoanBalance(1);
     console.log(`Loan 1 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} ETH`);
-    console.log("New collateral ratio loan0: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("New collateral ratio loan1: " + await this.loanContract.getActualCollateralRatio(1));
+    console.log("New collateral ratio loan0: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("New collateral ratio loan1: " + await this.JLoan.getActualCollateralRatio(1));
     lenderBal = await web3.eth.getBalance(lender1);
     console.log(`New lender1 ETH Balance: ${web3.utils.fromWei(lenderBal, "ether")} ETH`)
   });
@@ -785,31 +745,31 @@ function lendersGetAccruedInterest(lender1, lender2) {
   it('lender2 can have accrued interests from loan2 and loan3 as per RPB', async function () {
     lenderBal = await this.erc20Coll1.balanceOf(lender2);
     console.log(`Lender2 Coll Tokens Balance: ${web3.utils.fromWei(lenderBal, "ether")} Collat. Coins`);
-    console.log("Accrued interests loan2: " + await this.loanContract.getAccruedInterests(2));
-    console.log("Accrued interests loan3: " + await this.loanContract.getAccruedInterests(3));
-    contractBalance = await this.loanContract.getContractBalance(3);
+    console.log("Accrued interests loan2: " + await this.JLoan.getAccruedInterests(2));
+    console.log("Accrued interests loan3: " + await this.JLoan.getAccruedInterests(3));
+    contractBalance = await this.JLoan.getContractBalance(3);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} Collat. Coins`);
-    loanBalance = await this.loanContract.getLoanBalance(2);
+    loanBalance = await this.JLoan.getLoanBalance(2);
     console.log(`Loan2 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} Collat. Coins`);
-    loanBalance = await this.loanContract.getLoanBalance(3);
+    loanBalance = await this.JLoan.getLoanBalance(3);
     console.log(`Loan3 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} Collat. Coins`);
-    tx = await this.loanContract.withdrawInterests(2, {from: lender2});
+    tx = await this.JLoan.withdrawInterests(2, {from: lender2});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender2 withdraw interests costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
-    tx = await this.loanContract.withdrawInterests(3, {from: lender2});
+    tx = await this.JLoan.withdrawInterests(3, {from: lender2});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Lender2 withdraw interests costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
     expectEvent(tx, "InterestsWithdrawed");
-    contractBalance = await this.loanContract.getContractBalance(3);
+    contractBalance = await this.JLoan.getContractBalance(3);
     console.log(`Contract Balance: ${web3.utils.fromWei(contractBalance.toString(), "ether")} Collat. Coins`);
-    loanBalance = await this.loanContract.getLoanBalance(2);
+    loanBalance = await this.JLoan.getLoanBalance(2);
     console.log(`Loan2 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} Collat. Coins`);
-    loanBalance = await this.loanContract.getLoanBalance(3);
+    loanBalance = await this.JLoan.getLoanBalance(3);
     console.log(`Loan3 Balance: ${web3.utils.fromWei(loanBalance.toString(), "ether")} Collat. Coins`);
-    console.log("New collateral ratio loan2: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("New collateral ratio loan3: " + await this.loanContract.getActualCollateralRatio(1));
+    console.log("New collateral ratio loan2: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("New collateral ratio loan3: " + await this.JLoan.getActualCollateralRatio(1));
     lenderBal = await this.erc20Coll1.balanceOf(lender2);
     console.log(`Lender2 Coll Tokens Balance: ${web3.utils.fromWei(lenderBal, "ether")} Collat. Coins`);
   });
@@ -819,11 +779,11 @@ function lendersGetAccruedInterest(lender1, lender2) {
 function priceDownfor150(factoryAdmin) {
   it('ETH pair price goes down, collateral under 150%, foreclosing', async function () {
     console.log("Pair price: " + await this.JPriceOracle.getPairValue(0));
-    console.log("Loan0 collateral ratio: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("Loan1 collateral ratio: " + await this.loanContract.getActualCollateralRatio(1));
-    loanStatus = await this.loanContract.getLoanStatus(0);
+    console.log("Loan0 collateral ratio: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("Loan1 collateral ratio: " + await this.JLoan.getActualCollateralRatio(1));
+    loanStatus = await this.JLoan.getLoanStatus(0);
     console.log("Loan0 Status:" + loanStatus);
-    loanStatus = await this.loanContract.getLoanStatus(1);
+    loanStatus = await this.JLoan.getLoanStatus(1);
     console.log("Loan1 Status:" + loanStatus);
     tx = await this.JPriceOracle.setPairValue(0, 22500, 2, {from: factoryAdmin});
     console.log(tx.receipt.gasUsed);
@@ -833,11 +793,11 @@ function priceDownfor150(factoryAdmin) {
     newPrice = await this.JPriceOracle.getPairValue(0);
     expect(newPrice.toString()).to.be.bignumber.equal((pair.pairValue).toString());
     console.log("Pair Price: " + newPrice);
-    console.log("Loan0 collateral ratio: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("Loan1 collateral ratio: " + await this.loanContract.getActualCollateralRatio(1));
-    loanStatus0 = await this.loanContract.getLoanStatus(0);
+    console.log("Loan0 collateral ratio: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("Loan1 collateral ratio: " + await this.JLoan.getActualCollateralRatio(1));
+    loanStatus0 = await this.JLoan.getLoanStatus(0);
     console.log("Loan0 Status:" + loanStatus0);
-    loanStatus1 = await this.loanContract.getLoanStatus(1);
+    loanStatus1 = await this.JLoan.getLoanStatus(1);
     console.log("Loan1 Status:" + loanStatus1);
     expect(loanStatus0.toString()).to.be.equal(new BN(1).toString());
     expect(loanStatus1.toString()).to.be.equal(new BN(1).toString());
@@ -845,11 +805,11 @@ function priceDownfor150(factoryAdmin) {
 
   it('Coll Token pair price goes down, collateral under 150%, foreclosing', async function () {
     console.log("Pair price: " + await this.JPriceOracle.getPairValue(1));
-    console.log("Loan2 collateral ratio: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("Loan3 collateral ratio: " + await this.loanContract.getActualCollateralRatio(3));
-    loanStatus = await this.loanContract.getLoanStatus(2);
+    console.log("Loan2 collateral ratio: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("Loan3 collateral ratio: " + await this.JLoan.getActualCollateralRatio(3));
+    loanStatus = await this.JLoan.getLoanStatus(2);
     console.log("Loan2 Status:" + loanStatus);
-    loanStatus = await this.loanContract.getLoanStatus(3);
+    loanStatus = await this.JLoan.getLoanStatus(3);
     console.log("Loan3 Status:" + loanStatus);
     tx = await this.JPriceOracle.setPairValue(1, 10785, 6, {from: factoryAdmin});
     console.log(tx.receipt.gasUsed);
@@ -859,11 +819,11 @@ function priceDownfor150(factoryAdmin) {
     newPrice = await this.JPriceOracle.getPairValue(1);
     expect(newPrice.toString()).to.be.bignumber.equal((pair.pairValue).toString());
     console.log("Pair Price: " + newPrice);
-    console.log("Loan2 collateral ratio: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("Loan3 collateral ratio: " + await this.loanContract.getActualCollateralRatio(3));
-    loanStatus2 = await this.loanContract.getLoanStatus(2);
+    console.log("Loan2 collateral ratio: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("Loan3 collateral ratio: " + await this.JLoan.getActualCollateralRatio(3));
+    loanStatus2 = await this.JLoan.getLoanStatus(2);
     console.log("Loan2 Status:" + loanStatus2);
-    loanStatus3 = await this.loanContract.getLoanStatus(3);
+    loanStatus3 = await this.JLoan.getLoanStatus(3);
     console.log("Loan3 Status:" + loanStatus3);
     expect(loanStatus2.toString()).to.be.equal(new BN(1).toString());
     expect(loanStatus3.toString()).to.be.equal(new BN(1).toString());
@@ -875,7 +835,7 @@ function firstForeclosing(foreclosureAgent) {
   it('initiate foreclosure procedures for ETH collateral under 150% but above 120%, status from 1 to 4 on loan1, no change on loan0', async function () {
     agentBal = await web3.eth.getBalance(foreclosureAgent);
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} ETH`);
-    tx = await this.loanContract.initiateLoanForeclose(1, {from: foreclosureAgent});
+    tx = await this.JLoan.initiateLoanForeclose(1, {from: foreclosureAgent});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Initiate Loan1 Foreclose costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
@@ -883,11 +843,11 @@ function firstForeclosing(foreclosureAgent) {
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} ETH`);
     JFeesCollBalance = await this.JFeesCollector.getEthBalance();
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} ETH`);
-    console.log("Loan0 collateral ratio: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("Loan1 collateral ratio: " + await this.loanContract.getActualCollateralRatio(1));
-    loanStatus0 = await this.loanContract.getLoanStatus(0);
+    console.log("Loan0 collateral ratio: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("Loan1 collateral ratio: " + await this.JLoan.getActualCollateralRatio(1));
+    loanStatus0 = await this.JLoan.getLoanStatus(0);
     console.log("Loan0 Status:" + loanStatus0);
-    loanStatus1 = await this.loanContract.getLoanStatus(1);
+    loanStatus1 = await this.JLoan.getLoanStatus(1);
     console.log("Loan1 Status:" + loanStatus1);
     expect(loanStatus0).to.be.bignumber.equal(new BN(1).toString());
     expect(loanStatus1).to.be.bignumber.equal(new BN(4).toString());
@@ -898,7 +858,7 @@ function firstForeclosing(foreclosureAgent) {
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} ETH`);
     agentBal = await this.erc20Coll1.balanceOf(foreclosureAgent);
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} Collat. Coins`);
-    tx = await this.loanContract.initiateLoanForeclose(3, {from: foreclosureAgent});
+    tx = await this.JLoan.initiateLoanForeclose(3, {from: foreclosureAgent});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Initiate Loan3 Foreclose costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
@@ -906,11 +866,11 @@ function firstForeclosing(foreclosureAgent) {
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} Collat. Coins`);
     JFeesCollBalance = await this.JFeesCollector.getTokenBalance(this.erc20Coll1.address);
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} Collat. Coins`);
-    console.log("Loan2 collateral ratio: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("Loan3 collateral ratio: " + await this.loanContract.getActualCollateralRatio(3));
-    loanStatus2 = await this.loanContract.getLoanStatus(2);
+    console.log("Loan2 collateral ratio: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("Loan3 collateral ratio: " + await this.JLoan.getActualCollateralRatio(3));
+    loanStatus2 = await this.JLoan.getLoanStatus(2);
     console.log("Loan2 Status:" + loanStatus2);
-    loanStatus3 = await this.loanContract.getLoanStatus(3);
+    loanStatus3 = await this.JLoan.getLoanStatus(3);
     console.log("Loan3 Status:" + loanStatus3);
     expect(loanStatus2).to.be.bignumber.equal(new BN(1).toString());
     expect(loanStatus3).to.be.bignumber.equal(new BN(4).toString());
@@ -919,7 +879,7 @@ function firstForeclosing(foreclosureAgent) {
   it('initiate foreclosure procedures even on loan0', async function () {
     agentBal = await web3.eth.getBalance(foreclosureAgent);
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} ETH`);
-    tx = await this.loanContract.initiateLoanForeclose(0, {from: foreclosureAgent});
+    tx = await this.JLoan.initiateLoanForeclose(0, {from: foreclosureAgent});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Initiate Loan1 Foreclose costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
@@ -927,11 +887,11 @@ function firstForeclosing(foreclosureAgent) {
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} ETH`);
     JFeesCollBalance = await this.JFeesCollector.getEthBalance();
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} ETH`);
-    console.log("Loan0 collateral ratio: " + await this.loanContract.getActualCollateralRatio(0));
-    console.log("Loan1 collateral ratio: " + await this.loanContract.getActualCollateralRatio(1));
-    loanStatus0 = await this.loanContract.getLoanStatus(0);
+    console.log("Loan0 collateral ratio: " + await this.JLoan.getActualCollateralRatio(0));
+    console.log("Loan1 collateral ratio: " + await this.JLoan.getActualCollateralRatio(1));
+    loanStatus0 = await this.JLoan.getLoanStatus(0);
     console.log("Loan Status:" + loanStatus0);
-    loanStatus1 = await this.loanContract.getLoanStatus(1);
+    loanStatus1 = await this.JLoan.getLoanStatus(1);
     console.log("Loan Status:" + loanStatus1);
     expect(loanStatus0).to.be.bignumber.equal(new BN(4).toString());
     expect(loanStatus1).to.be.bignumber.equal(new BN(4).toString());
@@ -942,7 +902,7 @@ function firstForeclosing(foreclosureAgent) {
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} ETH`);
     agentBal = await this.erc20Coll1.balanceOf(foreclosureAgent);
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} Collat. Coins`);
-    tx = await this.loanContract.initiateLoanForeclose(2, {from: foreclosureAgent});
+    tx = await this.JLoan.initiateLoanForeclose(2, {from: foreclosureAgent});
     console.log(tx.receipt.gasUsed);
     totcost = tx.receipt.gasUsed * GAS_PRICE;
     console.log("Initiate Loan3 Foreclose costs: " + web3.utils.fromWei(totcost.toString(), 'ether') + " ETH");
@@ -950,24 +910,24 @@ function firstForeclosing(foreclosureAgent) {
     console.log(`foreclosureAgent Balance: ${web3.utils.fromWei(agentBal, "ether")} Collat. Coins`);
     JFeesCollBalance = await this.JFeesCollector.getTokenBalance(this.erc20Coll1.address);
     console.log(`JFeesCollector Balance: ${web3.utils.fromWei(JFeesCollBalance.toString(), "ether")} Collat. Coins`);
-    console.log("Loan2 collateral ratio: " + await this.loanContract.getActualCollateralRatio(2));
-    console.log("Loan3 collateral ratio: " + await this.loanContract.getActualCollateralRatio(3));
-    loanStatus2 = await this.loanContract.getLoanStatus(2);
+    console.log("Loan2 collateral ratio: " + await this.JLoan.getActualCollateralRatio(2));
+    console.log("Loan3 collateral ratio: " + await this.JLoan.getActualCollateralRatio(3));
+    loanStatus2 = await this.JLoan.getLoanStatus(2);
     console.log("Loan2 Status:" + loanStatus2);
-    loanStatus3 = await this.loanContract.getLoanStatus(3);
+    loanStatus3 = await this.JLoan.getLoanStatus(3);
     console.log("Loan3 Status:" + loanStatus3);
     expect(loanStatus2).to.be.bignumber.equal(new BN(4).toString());
     expect(loanStatus3).to.be.bignumber.equal(new BN(4).toString());
   });
 
   it('initiate again foreclosure procedures for collateral under 150% for loan0 and loan1 (fail)', async function () {
-    await expectRevert(this.loanContract.initiateLoanForeclose(0, {from: foreclosureAgent}), "!Status23");
-    await expectRevert(this.loanContract.initiateLoanForeclose(1, {from: foreclosureAgent}), "!Status23");
+    await expectRevert(this.JLoan.initiateLoanForeclose(0, {from: foreclosureAgent}), "!Status23");
+    await expectRevert(this.JLoan.initiateLoanForeclose(1, {from: foreclosureAgent}), "!Status23");
   });
 
   it('initiate again foreclosure procedures for collateral under 150% for loan2 and loan3 (fail)', async function () {
-    await expectRevert(this.loanContract.initiateLoanForeclose(2, {from: foreclosureAgent}), "!Status23");
-    await expectRevert(this.loanContract.initiateLoanForeclose(3, {from: foreclosureAgent}), "!Status23");
+    await expectRevert(this.JLoan.initiateLoanForeclose(2, {from: foreclosureAgent}), "!Status23");
+    await expectRevert(this.JLoan.initiateLoanForeclose(3, {from: foreclosureAgent}), "!Status23");
   });
 }
 

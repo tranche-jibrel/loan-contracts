@@ -1,34 +1,36 @@
-# Steps to deploy loans Factory Upgradeable
+# Steps to deploy upgradeable contracts
 #### a single wallet should deploy everything in this phase, because some function are marked as onlyOwner
 
-a) first the deployer should be deployed (JLoanDeployer)
+#### use "deployProxy" whenever you deploy with Truffle, and update contracts using "upgradeProxy"
 
-b) deploy JFeesCollector (eth and tokens allowed).
+#### to set the owner inside contracts please call initialize function for eache one, eventually inserting other required parameters
 
-c) then the factory should be deployed (JFactory) with deployer address in parameters of constructor
+a) deploy JFeesCollector contract.
 
-d) set the factory address inside the deployer (setLoanFactory(factoryAddress), only owner can do that)
+b) deploy JPriceOracle contract.
 
-e) set the fee collectsr address inside the deployer (setFeesCollector(address payable _feeColl), only owner can do that)
+c) deploy JLoanHelper contract (JPriceOracle address in initialize).
 
-f) create 1 or more pair to have prices inside JFactory contract (setNewPair, see description below, again only owner can do that). When ETH is the collateral, base address should be set to address(0).
+d) deploy JLoan (JPriceOracle, JFeesCollector and JLoanHelper in initialize)
 
-g) calculate the amount needed to have a loan in stable coin units (calcMinCollateralWithFeesAmount(uint _pairId, uint _askAmount), this is public). The result of this function is in wei. 
+e) create 1 or more pair to have prices inside JPriceOracle contract (setNewPair, see description below, again only owner can do that). When ETH is the collateral, base address should be set to address(0).
 
-h) from JFactory deploy a contract that will be used for every pair:
+f) calculate the amount needed to have a loan in stable coin units (calcMinCollateralWithFeesAmount(uint256 _pairId, uint256 _askAmount), this is a public function). The result of this function is in wei. 
 
-	createNewLoanContract()
+g) from JLoan contract open a new loan:
+
+	 openNewLoan(uint256 _pairId, uint256 _borrowedAskAmount, uint256 _rpbRate)
 
 
-i) please find total deployed loans calling pairCounter, and ask for address with getDeployedLoan(uint _idx) to have loans contract address (JFactory)
+h) you can find total opened loans calling loanId from Jloan contract
 
-j) add tokens into JFeesCollector contract with addTokenToList(address _tok) (onlyOwner) to find token balances.
+i) add address for tokens that JFeesCollector contract has to allow, with addTokenToList(address _tok) (onlyOwner).
 
 
 ## Setting a pair
 When setting a new pair, the following function has to be called:
 
-	function setNewPair(string memory _pairName, uint _price, uint8 _pairDecimals, uint8 _baseDecimals, uint8 _quoteDecimals) public onlyOwner 
+	function setNewPair(string memory _pairName, uint256 _price, uint8 _pairDecimals, uint8 _baseDecimals, uint8 _quoteDecimals) public onlyOwner 
 	
 It is important to have this standard:
 

@@ -8,47 +8,81 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
-import "./IJFactory.sol";
 import "./IJPriceOracle.sol";
 
 contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle { 
     using SafeMath for uint256;
 
-    address public factoryAddress;
+    mapping (address => bool) private _Admins;
+
+    uint256 public contractVersion;
 
     struct Pair {
         string pairName;
-        uint pairValue;
+        uint256 pairValue;
         address baseAddress;
         address quoteAddress;
         uint8 pairDecimals;
         uint8 baseDecimals;
         uint8 quoteDecimals;
     }
-    mapping(uint => Pair) public pairs;
-    uint public pairCounter;
+    mapping(uint256 => Pair) public pairs;
+    uint256 public pairCounter;
 
-    event NewPair(uint indexed _pairId, string _pairName);
-    event NewPrice(uint indexed pairId, string indexed pairName, uint pairValue, uint8 pairDecimals);
-    event NewPairDecimals(uint indexed pairId, string indexed pairName, uint8 baseDecimals, uint8 quoteDecimals);
-    event NewPairAddresses(uint indexed pairId, string indexed pairName, address baseAddress , address quoteAddress);
+    event AdminAdded(address account);
+    event AdminRemoved(address account);
+    event NewPair(uint256 indexed _pairId, string _pairName);
+    event NewPrice(uint256 indexed pairId, string indexed pairName, uint256 pairValue, uint8 pairDecimals);
+    event NewPairDecimals(uint256 indexed pairId, string indexed pairName, uint8 baseDecimals, uint8 quoteDecimals);
+    event NewPairAddresses(uint256 indexed pairId, string indexed pairName, address baseAddress , address quoteAddress);
 
     function initialize() public initializer() {
         OwnableUpgradeSafe.__Ownable_init();
+        _Admins[msg.sender] = true;
+        contractVersion = 1;
     }
 
     modifier onlyAdmins() {
-        require(IJFactory(factoryAddress).isAdmin(msg.sender), "!Admin");
+        require(isAdmin(msg.sender), "!Admin");
         _;
     }
 
+     /*   Admins Roles Mngmt  */
+    function _addAdmin(address account) internal {
+        _Admins[account] = true;
+        emit AdminAdded(account);
+    }
+
+    function _removeAdmin(address account) internal {
+        _Admins[account] = false;
+        emit AdminRemoved(account);
+    }
+
+    function isAdmin(address account) public override view returns (bool) {
+        return _Admins[account];
+    }
+
+    function addAdmin(address account) external override onlyAdmins {
+        require(account != address(0), "Not a valid address!");
+        require(!isAdmin(account), " Address already Administrator");
+        _addAdmin(account);
+    }
+
+    function removeAdmin(address account) external override onlyAdmins {
+        _removeAdmin(account);
+    }
+
+    function renounceAdmin() external override onlyAdmins {
+        _removeAdmin(msg.sender);
+    }
+
     /**
-    * @dev set factory address
-    * @param _factoryAddress factory address
+    * @dev update contract version
+    * @param _ver new version
     */
-    function setFactoryAddress(address _factoryAddress) external override onlyOwner {
-        require(_factoryAddress != address(0), "!validAddress");
-        factoryAddress = _factoryAddress;
+    function updateVersion(uint256 _ver) external onlyAdmins {
+        require(_ver > contractVersion, "!NewVersion");
+        contractVersion = _ver;
     }
 
     /**
@@ -61,7 +95,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _quoteAddress quote address token
     * @param _quoteDecimals quote decimals token
     */
-    function setNewPair(string memory _pairName, uint _price, uint8 _pairDecimals, 
+    function setNewPair(string memory _pairName, uint256 _price, uint8 _pairDecimals, 
                 address _baseAddress, uint8 _baseDecimals, address _quoteAddress, uint8 _quoteDecimals) external override onlyAdmins {
         pairs[pairCounter] = Pair({pairName: _pairName, pairValue: _price, pairDecimals: _pairDecimals, 
                 baseAddress: _baseAddress, baseDecimals: _baseDecimals, quoteAddress: _quoteAddress, quoteDecimals: _quoteDecimals});
@@ -75,7 +109,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _price price of the pair
     * @param _pairDecimals number of decimals for pair
     */
-    function setPairValue(uint _pairId, uint _price, uint8 _pairDecimals) external override onlyAdmins {
+    function setPairValue(uint256 _pairId, uint256 _price, uint8 _pairDecimals) external override onlyAdmins {
         require(_pairId < pairCounter, "pair does not exists");
         pairs[_pairId].pairValue = _price;
         pairs[_pairId].pairDecimals = _pairDecimals;
@@ -88,7 +122,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _baseDecimals base decimals of the pair
     * @param _quoteDecimals quote decimals for pair
     */
-    function setBaseQuoteDecimals(uint _pairId, uint8 _baseDecimals, uint8 _quoteDecimals) external override onlyAdmins {
+    function setBaseQuoteDecimals(uint256 _pairId, uint8 _baseDecimals, uint8 _quoteDecimals) external override onlyAdmins {
         require(_pairId < pairCounter, "pair does not exists");
         pairs[_pairId].baseDecimals = _baseDecimals;
         pairs[_pairId].quoteDecimals = _quoteDecimals;
@@ -99,7 +133,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @dev get a pair price
     * @return pairs counter
     */
-    function getPairCounter() external override view returns (uint) {
+    function getPairCounter() external override view returns (uint256) {
         return pairCounter;
     }
 
@@ -108,7 +142,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _pairId number of the pair
     * @return price of the pair
     */
-    function getPairValue(uint _pairId) external override view returns (uint) {
+    function getPairValue(uint256 _pairId) external override view returns (uint256) {
         require(_pairId < pairCounter, "pair does not exists");
         return pairs[_pairId].pairValue;
     }
@@ -118,7 +152,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _pairId number of the pair
     * @return name of the pair
     */
-    function getPairName(uint _pairId) external override view returns (string memory) {
+    function getPairName(uint256 _pairId) external override view returns (string memory) {
         require(_pairId < pairCounter, "pair does not exists");
         return pairs[_pairId].pairName;
     }
@@ -128,7 +162,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _pairId number of the pair
     * @return decimals of the pair
     */
-    function getPairDecimals(uint _pairId) external override view returns (uint8) {
+    function getPairDecimals(uint256 _pairId) external override view returns (uint8) {
         require(_pairId < pairCounter, "pair does not exists");
         return pairs[_pairId].pairDecimals;
     }
@@ -138,7 +172,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _pairId number of the pair
     * @return number of base currency decimals
     */
-    function getPairBaseDecimals(uint _pairId) external override view returns (uint8) {
+    function getPairBaseDecimals(uint256 _pairId) external override view returns (uint8) {
         require(_pairId < pairCounter, "pair does not exists");
         return pairs[_pairId].baseDecimals;
     }
@@ -148,7 +182,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _pairId number of the pair
     * @return number of quote currency decimals
     */
-    function getPairQuoteDecimals(uint _pairId) external override view returns (uint8) {
+    function getPairQuoteDecimals(uint256 _pairId) external override view returns (uint8) {
         require(_pairId < pairCounter, "pair does not exists");
         return pairs[_pairId].quoteDecimals;
     }
@@ -158,7 +192,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _pairId number of the pair
     * @return address of base currency decimals
     */
-    function getPairBaseAddress(uint _pairId) external override view returns (address) {
+    function getPairBaseAddress(uint256 _pairId) external override view returns (address) {
         require(_pairId < pairCounter, "pair does not exists");
         return pairs[_pairId].baseAddress;
     }
@@ -168,7 +202,7 @@ contract JPriceOracle is OwnableUpgradeSafe, IJPriceOracle {
     * @param _pairId number of the pair
     * @return address of quote currency decimals
     */
-    function getPairQuoteAddress(uint _pairId) external override view returns (address) {
+    function getPairQuoteAddress(uint256 _pairId) external override view returns (address) {
         require(_pairId < pairCounter, "pair does not exists");
         return pairs[_pairId].quoteAddress;
     }

@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-ethereum-package/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "./TransferHelper.sol";
 
-contract JFeesCollector is OwnableUpgradeSafe {
+contract JFeesCollector2 is OwnableUpgradeSafe {
     using SafeMath for uint256;
 
     mapping(address => bool) public tokensAllowed;
@@ -30,7 +30,7 @@ contract JFeesCollector is OwnableUpgradeSafe {
         OwnableUpgradeSafe.__Ownable_init();
         contractVersion = 1;
     }
-
+    
     /**
     * @dev update contract version
     * @param _ver new version
@@ -117,4 +117,7 @@ contract JFeesCollector is OwnableUpgradeSafe {
         fLock = false;
     }
 
+    function sayHello() public pure returns (string memory) {
+        return "Hello";
+    }
 }
